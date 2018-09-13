@@ -87,7 +87,7 @@ func doParse(pathToData string) error {
 	_ = scanner.Text()
 
 	// go through remaining rows
-	ticketChan := make(chan *ticket, 0)
+	ticketChan := make(chan *ticket, 100)
 	lineChan := make(chan string, 0)
 
 	// generate pool of line parsers
