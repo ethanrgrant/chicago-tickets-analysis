@@ -59,9 +59,6 @@ func (c *CSVTestSuite) Test_GenerateTicket_ColumnNameIncoorect_Error() {
 	err := ticket.addValue("not_a_columnn", "0")
 	c.Error(err)
 }
-func (c *CSVTestSuite) Test_AddMultipleRows_RowsExist() {
-	return
-}
 
 func (c *CSVTestSuite) Test_ParseFullLine_CreatesFullTicket() {
 	// first line from file
@@ -69,8 +66,20 @@ func (c *CSVTestSuite) Test_ParseFullLine_CreatesFullTicket() {
 	line += `90ad622c3274c9bdc9d8c812b79a01d0aaf7479f2bd7431f8935baa4048d0c86,`
 	line += `IL,PAS,60638,0976160F,EXPIRED PLATES OR TEMPORARY REGISTRATION,8,CPD,CHEV,50,`
 	line += `100,0,100,Paid,2007-05-21 00:00:00,SEIZ,"",5048648030,15227,"6000 w 64th st,"chicago, il`
-	testTicket, err := parseLine(line)
-	c.NoError(err)
+
+	// go through remaining rows
+	ticketChan := make(chan *ticket, 0)
+	lineChan := make(chan string, 0)
+
+	// generate pool of line parsers
+	workerCount := 1
+	for i := 0; i < workerCount; i++ {
+		go parseLine(lineChan, ticketChan)
+	}
+
+	lineChan <- line
+	close(lineChan)
+	testTicket := <-ticketChan
 	goodTicket := ticket{
 		ticketNumber:         51551278,
 		zipcode:              60638,

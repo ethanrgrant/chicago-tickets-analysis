@@ -85,13 +85,27 @@ func doParse(pathToData string) error {
 	}
 	// discard name of columns
 	_ = scanner.Text()
+
 	// go through remaining rows
+	ticketChan := make(chan *ticket, 0)
+	lineChan := make(chan string, 0)
+
+	// generate pool of line parsers
+	workerCount := 25
+	for i := 0; i < workerCount; i++ {
+		go parseLine(lineChan, ticketChan)
+	}
+
+	totalLines := 0
 	for scanner.Scan() {
-		// TODO add each ticket to database
-		_, err := parseLine(scanner.Text())
-		if err != nil {
-			log.WithError(err).Error("Failed to parse row!")
-		}
+		lineChan <- scanner.Text()
+		totalLines += 1
+	}
+	close(lineChan)
+
+	// send ticket to db to be processed
+	for i := 0; i < totalLines; i++ {
+		db.addTicket(*<-ticketChan)
 	}
 	return nil
 }
@@ -113,16 +127,18 @@ var (
 	}
 )
 
-func parseLine(input string) (*ticket, error) {
-	columns := strings.Split(input, ",")
-	tic := &ticket{}
-	for i, val := range columns {
-		if columnName, ok := goodColumns[i]; ok {
-			err := tic.addValue(columnName, val)
-			if err != nil {
-				return &ticket{}, err
+func parseLine(lines chan string, ticketChan chan *ticket) {
+	for line := range lines {
+		columns := strings.Split(line, ",")
+		tic := &ticket{}
+		for i, val := range columns {
+			if columnName, ok := goodColumns[i]; ok {
+				err := tic.addValue(columnName, val)
+				if err != nil {
+					ticketChan <- &ticket{}
+				}
 			}
 		}
+		ticketChan <- tic
 	}
-	return tic, nil
 }
