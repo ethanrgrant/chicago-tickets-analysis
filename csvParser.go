@@ -78,25 +78,17 @@ func doParse(pathToData string) error {
 
 	scanner := bufio.NewScanner(file)
 	db, err := newDBAccessor("Parking.db")
+	_ = db
 	if err != nil {
 		log.WithError(err).Error("Failed to open db, no point in trying to parse")
 		return err
 	}
-
-	goodColumns := map[string]bool{
-		"ticket_number":         true,
-		"issue_date":            true,
-		"violation_location":    true,
-		"zipcode":               true,
-		"violation_code":        true,
-		"violation_description": true,
-		"fine_level1_amount":    true,
-		"officer":               true,
-	}
-	_ = goodColumns
-	columnTitles := strings.Split(scanner.Text(), ",")
+	// discard name of columns
+	_ = scanner.Text()
+	// go through remaining rows
 	for scanner.Scan() {
-		err = parseLine(scanner.Text(), columnTitles, db)
+		// TODO add each ticket to database
+		_, err := parseLine(scanner.Text())
 		if err != nil {
 			log.WithError(err).Error("Failed to parse row!")
 		}
@@ -108,17 +100,29 @@ type ticketAdder interface {
 	addTicket(t ticket) error
 }
 
-func parseLine(input string, columnTitles []string, ticketAdder ticketAdder) error {
+var (
+	goodColumns = map[int]string{
+		0:  "ticket_number",
+		1:  "issue_date",
+		2:  "violation_location",
+		6:  "zipcode",
+		7:  "violation_code",
+		8:  "violation_description",
+		12: "fine_level1_amount",
+		21: "officer",
+	}
+)
+
+func parseLine(input string) (*ticket, error) {
 	columns := strings.Split(input, ",")
-	var ticket ticket
-	for _, val := range columns {
-		_ = val
-		continue
+	tic := &ticket{}
+	for i, val := range columns {
+		if columnName, ok := goodColumns[i]; ok {
+			err := tic.addValue(columnName, val)
+			if err != nil {
+				return &ticket{}, err
+			}
+		}
 	}
-	err := ticketAdder.addTicket(ticket)
-	if err != nil {
-		log.WithError(err).Error("Failed to add ticket!")
-		return err
-	}
-	return nil
+	return tic, nil
 }
