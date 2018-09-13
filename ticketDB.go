@@ -18,7 +18,7 @@ func newDBAccessor(dbName string) (*dbAccessor, error) {
 	return &dbAccessor{db}, nil
 }
 
-func (d *dbAccessor) addRow(test string) {
+func (d *dbAccessor) addTicket(ticket ticket) error {
 	// todo
-	return
+	return nil
 }
