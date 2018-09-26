@@ -110,10 +110,6 @@ func doParse(pathToData string) error {
 	return nil
 }
 
-type ticketAdder interface {
-	addTicket(t ticket) error
-}
-
 var (
 	goodColumns = map[int]string{
 		0:  "ticket_number",
