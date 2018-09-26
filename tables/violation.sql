@@ -1,4 +1,5 @@
 CREATE TABLE violation (
     violationCode         text,
-    violationDescription  text
+    violationDescription  text,
+    PRIMARY KEY(violationCode)
 );
