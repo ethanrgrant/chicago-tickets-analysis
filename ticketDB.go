@@ -2,9 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	log "github.com/sirupsen/logrus"
 
-	_ "github.com/mattn/go-sqlite3"
+	sq "github.com/mattn/go-sqlite3"
 )
 
 type dbAccessor struct {
@@ -12,8 +13,16 @@ type dbAccessor struct {
 }
 
 const (
-	addTicket    = "INSERT INTO ticket (ticketNum, zipcode, officer, issueDate, violationCode, fineAmt) VALUES (?, ?, ?, ?, ?, ?)"
-	addViolation = "INSERT INTO violation (violationCode, violationDescription) VALUES (?, ?)"
+	addTicket = `
+	INSERT INTO ticket (ticketNum, zipcode, officer, issueDate, violationCode, fineAmt)
+	VALUES (?, ?, ?, ?, ?, ?)`
+	addViolation = `
+	INSERT INTO violation (violationCode, violationDescription) 
+	VALUES (?, ?)`
+	getZips = `
+	SELECT zipcode, COUNT(1)
+	FROM ticket 
+	GROUP BY zipcode`
 )
 
 func newDBAccessor(dbName string) (*dbAccessor, error) {
@@ -26,7 +35,10 @@ func newDBAccessor(dbName string) (*dbAccessor, error) {
 }
 
 func (d *dbAccessor) addTicket(ticket ticket) error {
-	// todo shouldn't ignore this if it isn't a unique key error
+	// don't bother trying to add empty tickets
+	if ticket.ticketNumber == 0 {
+		return errors.New("Empty tickets are not accepted")
+	}
 	d.addViolation(ticket.violationCode, ticket.violationDescription)
 	_, err := d.Exec(addTicket,
 		ticket.ticketNumber,
@@ -44,9 +56,37 @@ func (d *dbAccessor) addTicket(ticket ticket) error {
 
 func (d *dbAccessor) addViolation(code string, desc string) error {
 	_, err := d.Exec(addViolation, code, desc)
+	if err == sq.ErrConstraintUnique { // https://godoc.org/github.com/mattn/go-sqlite3#pkg-files
+		return nil
+	}
 	if err != nil {
 		log.WithError(err).Error("Could not add violation")
 		return err
 	}
 	return nil
+}
+
+func (d *dbAccessor) getZipcodeMap() (map[int]int, error) {
+	rows, err := d.Query(getZips)
+	if err != nil {
+		log.WithError(err).Error("Failed to get zip info")
+		return nil, err
+	}
+	defer rows.Close()
+	zipTicketNum := make(map[int]int)
+	for rows.Next() {
+		var zip, count int
+		err = rows.Scan(&zip, &count)
+		if err != nil {
+			log.WithError(err).Error("diregarding a zip")
+			continue
+		}
+		zipTicketNum[zip] = count
+	}
+	err = rows.Err()
+	if err != nil {
+		log.WithError(err).Error("Could not get zips")
+		return nil, err
+	}
+	return zipTicketNum, nil
 }

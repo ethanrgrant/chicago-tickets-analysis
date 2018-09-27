@@ -70,8 +70,56 @@ func (d *DBTestSuite) Test_AddSameTicket_Error() {
 	err = d.db.addTicket(goodTicket)
 	d.Error(err)
 }
-func (d *DBTestSuite) Test_AddMultipleRows_RowsExist() {
-	return
+func (d *DBTestSuite) Test_AddEmptyTicket_Error() {
+	err := d.db.addTicket(ticket{})
+	d.Error(err)
+}
+
+func (d *DBTestSuite) Test_AddZip_CorrectCountReturned() {
+	testZip := 2
+	err := d.db.addTicket(ticket{ticketNumber: 1, zipcode: testZip})
+	d.NoError(err)
+	err = d.db.addTicket(ticket{ticketNumber: 2, zipcode: testZip})
+	d.NoError(err)
+	zipMap, err := d.db.getZipcodeMap()
+	d.NoError(err)
+	count, ok := zipMap[testZip]
+	d.True(ok)
+	d.Equal(2, count)
+}
+func (d *DBTestSuite) Test_AddMultipleZips_CorrectCountsReturned() {
+	testZip1 := 1
+	err := d.db.addTicket(ticket{ticketNumber: 1, zipcode: testZip1})
+	d.NoError(err)
+	err = d.db.addTicket(ticket{ticketNumber: 2, zipcode: testZip1})
+	d.NoError(err)
+	err = d.db.addTicket(ticket{ticketNumber: 3, zipcode: testZip1})
+	d.NoError(err)
+	testZip2 := 2
+	err = d.db.addTicket(ticket{ticketNumber: 4, zipcode: testZip2})
+	d.NoError(err)
+	err = d.db.addTicket(ticket{ticketNumber: 5, zipcode: testZip2})
+	d.NoError(err)
+	testZip3 := 3
+	err = d.db.addTicket(ticket{ticketNumber: 6, zipcode: testZip3})
+	d.NoError(err)
+	err = d.db.addTicket(ticket{ticketNumber: 7, zipcode: testZip3})
+	d.NoError(err)
+	err = d.db.addTicket(ticket{ticketNumber: 8, zipcode: testZip3})
+	d.NoError(err)
+	err = d.db.addTicket(ticket{ticketNumber: 9, zipcode: testZip3})
+	d.NoError(err)
+	zipMap, err := d.db.getZipcodeMap()
+	d.NoError(err)
+	count, ok := zipMap[testZip1]
+	d.True(ok)
+	d.Equal(3, count)
+	count, ok = zipMap[testZip2]
+	d.True(ok)
+	d.Equal(2, count)
+	count, ok = zipMap[testZip3]
+	d.True(ok)
+	d.Equal(4, count)
 }
 
 func TestDBTestSuite(t *testing.T) {
