@@ -48,7 +48,6 @@ func (d *dbAccessor) addTicket(ticket ticket) error {
 		ticket.violationCode,
 		ticket.fineAmt)
 	if err != nil {
-		log.WithError(err).Error("Could not insert ticket")
 		return err
 	}
 	return nil
@@ -60,7 +59,6 @@ func (d *dbAccessor) addViolation(code string, desc string) error {
 		return nil
 	}
 	if err != nil {
-		log.WithError(err).Error("Could not add violation")
 		return err
 	}
 	return nil
@@ -69,7 +67,6 @@ func (d *dbAccessor) addViolation(code string, desc string) error {
 func (d *dbAccessor) getZipcodeMap() (map[int]int, error) {
 	rows, err := d.Query(getZips)
 	if err != nil {
-		log.WithError(err).Error("Failed to get zip info")
 		return nil, err
 	}
 	defer rows.Close()
@@ -85,7 +82,6 @@ func (d *dbAccessor) getZipcodeMap() (map[int]int, error) {
 	}
 	err = rows.Err()
 	if err != nil {
-		log.WithError(err).Error("Could not get zips")
 		return nil, err
 	}
 	return zipTicketNum, nil

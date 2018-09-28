@@ -68,7 +68,11 @@ func (t *ticket) addValue(name string, value string) error {
 	return nil
 }
 
-func doParse(pathToData string) error {
+type addTicketer interface {
+	addTicket(ticket) error
+}
+
+func doParse(pathToData string, addTicketer addTicketer) error {
 	file, err := os.Open(pathToData)
 	if err != nil {
 		log.WithError(err).Error("Failed to find data. Path=%v", pathToData)
@@ -77,35 +81,29 @@ func doParse(pathToData string) error {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	db, err := newDBAccessor("Parking.db")
-	_ = db
-	if err != nil {
-		log.WithError(err).Error("Failed to open db, no point in trying to parse")
-		return err
-	}
+
 	// discard name of columns
 	_ = scanner.Text()
 
-	// go through remaining rows
-	ticketChan := make(chan *ticket, 100)
 	lineChan := make(chan string, 0)
 
 	// generate pool of line parsers
 	workerCount := 25
 	for i := 0; i < workerCount; i++ {
-		go parseLine(lineChan, ticketChan)
+		go parseLine(lineChan, addTicketer)
 	}
 
+	// go through remaining rows
 	totalLines := 0
 	for scanner.Scan() {
 		lineChan <- scanner.Text()
 		totalLines += 1
 	}
+	log.WithField("total tickets", totalLines).Info("Read csv")
 	close(lineChan)
 
 	// send ticket to db to be processed
 	for i := 0; i < totalLines; i++ {
-		db.addTicket(*<-ticketChan)
 	}
 	return nil
 }
@@ -123,7 +121,7 @@ var (
 	}
 )
 
-func parseLine(lines chan string, ticketChan chan *ticket) {
+func parseLine(lines chan string, addTicketer addTicketer) error {
 	for line := range lines {
 		columns := strings.Split(line, ",")
 		tic := &ticket{}
@@ -131,10 +129,15 @@ func parseLine(lines chan string, ticketChan chan *ticket) {
 			if columnName, ok := goodColumns[i]; ok {
 				err := tic.addValue(columnName, val)
 				if err != nil {
-					ticketChan <- &ticket{}
+					tic = &ticket{}
+					break
 				}
 			}
 		}
-		ticketChan <- tic
+		err := addTicketer.addTicket(*tic)
+		if err != nil {
+			log.WithError(err).Error("Could not add ticket to db, ignoring")
+		}
 	}
+	return nil
 }

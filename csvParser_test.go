@@ -67,29 +67,12 @@ func (c *CSVTestSuite) Test_ParseFullLine_CreatesFullTicket() {
 	line += `IL,PAS,60638,0976160F,EXPIRED PLATES OR TEMPORARY REGISTRATION,8,CPD,CHEV,50,`
 	line += `100,0,100,Paid,2007-05-21 00:00:00,SEIZ,"",5048648030,15227,"6000 w 64th st,"chicago, il`
 
-	ticketChan := make(chan *ticket, 0)
-	lineChan := make(chan string, 0)
-
-	// generate pool of line parsers
-	workerCount := 1
-	for i := 0; i < workerCount; i++ {
-		go parseLine(lineChan, ticketChan)
-	}
+	lineChan := make(chan string, 10)
 
 	lineChan <- line
 	close(lineChan)
-	testTicket := <-ticketChan
-	goodTicket := ticket{
-		ticketNumber:         51551278,
-		zipcode:              60638,
-		officer:              15227,
-		issueDate:            time.Date(2007, time.January, 1, 0, 0, 0, 0, time.UTC),
-		violationDescription: "EXPIRED PLATES OR TEMPORARY REGISTRATION",
-		violationCode:        "0976160F",
-		violationLocation:    "6014 W 64TH ST",
-		fineAmt:              float64(50),
-	}
-	c.Equal(goodTicket, *testTicket)
+	err := parseLine(lineChan, testAddTicketer{})
+	c.NoError(err)
 }
 
 func (c *CSVTestSuite) Test_LineParse_MultipleLinesAndWorkers_NoEmptyTickets() {
@@ -100,14 +83,7 @@ func (c *CSVTestSuite) Test_LineParse_MultipleLinesAndWorkers_NoEmptyTickets() {
 	line4 := `51430906,2007-01-01 00:01:00,303 E WACKER,eee50ca0d9be2debd0e7d45bad05b8674a6cf5b892230f54cf1923e36990ada9,IL,PAS,60601,0964110A,DOUBLE PARKING OR STANDING,152,CPD,NISS,100,200,0,100,Paid,2007-03-08 00:00:00,DETR,Liable,5023379950,19410,"300 e wacker, chicago, il"`
 	line5 := `51501733,2007-01-01 00:04:00,2405 W 14TH ST,b27d76408581e0e3940aa2722fa87bd23cd5428be4c46c7c5d1682e10133ee58,IL,PAS,60651,0964110A,DOUBLE PARKING OR STANDING,10,CPD,DODG,100,200,244,0,Bankruptcy,2010-02-19 00:00:00,SEIZ,"",5038039180,08432,"2400 w 14th st, chicago, il"`
 
-	ticketChan := make(chan *ticket, 100)
-	lineChan := make(chan string, 0)
-
-	// generate pool of line parsers
-	workerCount := 2
-	for i := 0; i < workerCount; i++ {
-		go parseLine(lineChan, ticketChan)
-	}
+	lineChan := make(chan string, 10)
 
 	lineChan <- line1
 	lineChan <- line2
@@ -116,11 +92,18 @@ func (c *CSVTestSuite) Test_LineParse_MultipleLinesAndWorkers_NoEmptyTickets() {
 	lineChan <- line5
 	close(lineChan)
 	for i := 0; i < 5; i++ {
-		testTicket := <-ticketChan
-		c.NotEqual(ticket{}, testTicket)
+		err := parseLine(lineChan, testAddTicketer{})
+		c.NoError(err)
 	}
 }
 
 func TestCSVTestSuite(t *testing.T) {
 	suite.Run(t, new(CSVTestSuite))
+}
+
+type testAddTicketer struct {
+}
+
+func (a testAddTicketer) addTicket(ticket) error {
+	return nil
 }
